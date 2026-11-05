@@ -15,6 +15,16 @@ export interface Site {
   business_hours: Record<string, { open: string; close: string } | null>;
 }
 
+export interface Holiday {
+  date: string; // "DD/MM/YYYY"
+  name: string;
+}
+
+export interface StatusOption {
+  value: Status;
+  label: string;
+}
+
 export interface HelpdeskRequest {
   id: number;
   ref: string;
@@ -24,7 +34,7 @@ export interface HelpdeskRequest {
   status: Status;
   priority: Priority;
   created_at: string; // ISO 8601, UTC
-  updated_at: string;
+  updated_at: string; // ISO 8601, UTC
   due_on: string | null; // YYYY-MM-DD, site local
   assignee: Staff | null;
   deleted_at: string | null;
@@ -50,4 +60,46 @@ export interface Page<T> {
   total_pages?: number;
   total?: number;
   has_more?: boolean;
+}
+
+export type ChangeItem =
+  | {
+      seq: number;
+      type: "request.created" | "request.updated";
+      at: string;
+      request: HelpdeskRequest;
+    }
+  | {
+      seq: number;
+      type: "event.created";
+      at: string;
+      request_id: number;
+      event: RequestEvent;
+    }
+  | {
+      seq: number;
+      type: "staff.updated";
+      at: string;
+      staff: Staff;
+    };
+
+export interface ChangesResponse {
+  data: ChangeItem[];
+  next_cursor: string;
+  has_more: boolean;
+}
+
+export type SortField = "created" | "due";
+export type SortDir = "asc" | "desc";
+
+export interface BoardFilters {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  siteId: number | "all";
+  status: Status | "all";
+  sortField: SortField;
+  sortDir: SortDir;
+  overdueOnly: boolean;
+  search: string;
+  selectedRequestId: number | null;
 }
