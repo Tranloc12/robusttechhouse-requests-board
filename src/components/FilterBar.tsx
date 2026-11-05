@@ -122,7 +122,7 @@ export function FilterBar({
           </select>
         </div>
 
-        <div className="filter-field">
+        <div className="filter-field filter-field-sort">
           <label htmlFor="filter-sort">Sort by</label>
           <div className="sort-inline">
             <select
