@@ -30,6 +30,7 @@ import {
 } from "./lib/urlState";
 import type {
   BoardFilters,
+  ChangeItem,
   HelpdeskRequest,
   RequestEvent,
   Site,
@@ -223,7 +224,7 @@ export default function App() {
         // 1. Poll /v1/changes (up to 3 batches per tick so we respect rate limits)
         let batches = 0;
         const maxBatches = changesCaughtUpRef.current ? 3 : 2;
-        const accumulatedChanges = [];
+        const accumulatedChanges: ChangeItem[] = [];
 
         while (batches < maxBatches) {
           batches++;
