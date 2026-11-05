@@ -11,6 +11,7 @@ interface FilterBarProps {
   totalCountingInRange: number;
   onUpdateFilters: (patch: Partial<BoardFilters>) => void;
   onResetFilters: () => void;
+  onDownloadCsv: () => void;
 }
 
 export function FilterBar({
@@ -22,6 +23,7 @@ export function FilterBar({
   totalCountingInRange,
   onUpdateFilters,
   onResetFilters,
+  onDownloadCsv,
 }: FilterBarProps) {
   const [copied, setCopied] = useState(false);
 
@@ -206,6 +208,16 @@ export function FilterBar({
               </>
             )}
           </span>
+
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={onDownloadCsv}
+            disabled={totalMatching === 0}
+            title={`Download all ${totalMatching} matching requests as requests-${filters.from}-${filters.to}.csv`}
+          >
+            ⬇ Download CSV ({totalMatching})
+          </button>
 
           <button
             type="button"

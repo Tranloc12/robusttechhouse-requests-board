@@ -16,6 +16,7 @@ import {
 import { FilterBar } from "./components/FilterBar";
 import { RequestDetailModal } from "./components/RequestDetailModal";
 import { RequestsTable } from "./components/RequestsTable";
+import { triggerCsvDownload } from "./lib/csv";
 import { addDays, toApiDate } from "./lib/dates";
 import {
   applyChangeItems,
@@ -613,6 +614,9 @@ export default function App() {
           totalCountingInRange={totalCountingInRange}
           onUpdateFilters={updateFilters}
           onResetFilters={resetFilters}
+          onDownloadCsv={() =>
+            triggerCsvDownload(rows, filters.from, filters.to)
+          }
         />
 
         {loadingInitial && requestsById.size === 0 ? (
