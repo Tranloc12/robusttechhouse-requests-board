@@ -73,10 +73,10 @@ describe("CSV export for finance team (client message)", () => {
       "ref,site,title,priority,status,assignee,created_at,due_on,overdue",
     );
     expect(lines[1]).toBe(
-      'WO-100,Robusttechhouse Tower Singapore,"AC ""noisy"", room warm",High,processing,Grace Ong-Wee,"06 Oct 2026, 10:15 (Asia/Singapore)",2026-10-07,true',
+      'WO-100,Robusttechhouse Tower Singapore,"AC ""noisy"", room warm",High,processing,Grace Ong-Wee,2026-10-06 10:15 (Asia/Singapore),2026-10-07,true',
     );
     expect(lines[2]).toBe(
-      'WO-101,Robusttechhouse Court Sydney,Wet floor,,pending,,"07 Oct 2026, 02:30 (Australia/Sydney)",,false',
+      "WO-101,Robusttechhouse Court Sydney,Wet floor,,pending,,2026-10-07 02:30 (Australia/Sydney),,false",
     );
   });
 });

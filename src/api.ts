@@ -191,12 +191,6 @@ export const listChanges = (
   options?: RequestOptions,
 ) => get<ChangesResponse>("/v1/changes", params, options);
 
-const COUNTING_STATUS_FILTER = JSON.stringify([
-  "pending",
-  "processing",
-  "complete",
-]);
-
 /**
  * Fetches all pages of requests for a site-local date range `[fromIso, toIso]`.
  * Queries the API with a ±1 day buffer (`fromIso - 1` to `toIso + 1`) because the
@@ -225,7 +219,6 @@ export async function fetchAllRequestsForRange(
       per_page: 100,
       created_from: bufferedFrom,
       created_to: bufferedTo,
-      status: COUNTING_STATUS_FILTER,
     },
     { signal: options.signal },
   );
@@ -257,7 +250,6 @@ export async function fetchAllRequestsForRange(
           per_page: 100,
           created_from: bufferedFrom,
           created_to: bufferedTo,
-          status: COUNTING_STATUS_FILTER,
         },
         { signal: options.signal },
       );

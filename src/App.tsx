@@ -7,7 +7,6 @@ import {
   fetchAllRequestsForRange,
   getRequest,
   listChanges,
-  listRequests,
   listSites,
   listStaff,
   listStatuses,
@@ -17,7 +16,6 @@ import { FilterBar } from "./components/FilterBar";
 import { RequestDetailModal } from "./components/RequestDetailModal";
 import { RequestsTable } from "./components/RequestsTable";
 import { triggerCsvDownload } from "./lib/csv";
-import { addDays, toApiDate } from "./lib/dates";
 import {
   applyChangeItems,
   buildSiteMap,
@@ -278,19 +276,11 @@ export default function App() {
           });
         }
 
-        // 2. Also refresh /v1/staff and the latest page of /v1/requests so live mutations
-        // show up immediately even before initial historical /v1/changes catch-up finishes.
-        const [freshStaff, latestReqsPage] = await Promise.all([
+        // 2. Refresh /v1/staff and all requests in the active date range so live mutations
+        // on any page (including status changes to canceled, deletions, or merges) are reflected.
+        const [freshStaff, freshRequestsMap] = await Promise.all([
           listStaff({ signal }),
-          listRequests(
-            {
-              page: 1,
-              per_page: 100,
-              created_from: toApiDate(addDays(filters.from, -1)),
-              created_to: toApiDate(addDays(filters.to, 1)),
-            },
-            { signal },
-          ),
+          fetchAllRequestsForRange(filters.from, filters.to, { signal }),
         ]);
 
         if (signal?.aborted) return;
@@ -299,9 +289,8 @@ export default function App() {
 
         const newlyChangedIds = new Set<number>();
         setRequestsById((prev) => {
-          const next = new Map(prev);
-          for (const req of latestReqsPage.data ?? []) {
-            const old = prev.get(req.id);
+          for (const [id, req] of freshRequestsMap) {
+            const old = prev.get(id);
             if (
               !old ||
               old.updated_at !== req.updated_at ||
@@ -311,11 +300,10 @@ export default function App() {
               old.due_on !== req.due_on ||
               old.assignee?.id !== req.assignee?.id
             ) {
-              if (prev.size > 0) newlyChangedIds.add(req.id);
+              if (prev.size > 0) newlyChangedIds.add(id);
             }
-            next.set(req.id, req);
           }
-          return next;
+          return freshRequestsMap;
         });
 
         if (newlyChangedIds.size > 0) {

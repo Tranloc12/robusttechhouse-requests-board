@@ -56,30 +56,17 @@ export function daysAgo(days: number, today = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
 
-const MONTHS_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
 /**
  * Formats an instant in the site's IANA timezone and explicitly names the zone (Rule 4).
- * Example: "06 Oct 2026, 10:15 (Asia/Singapore)"
+ * Uses `YYYY-MM-DD HH:MM (TimeZone)` without embedded commas so it is unambiguous
+ * on the board and clean in CSV/Excel exports.
+ * Example: "2026-10-06 10:15 (Asia/Singapore)"
  */
 export function formatInstantInSiteZone(instant: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
-    month: "short",
+    month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
@@ -87,7 +74,7 @@ export function formatInstantInSiteZone(instant: Date, timeZone: string): string
   }).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   const hour = get("hour") === "24" ? "00" : get("hour");
-  return `${get("day")} ${get("month")} ${get("year")}, ${hour}:${get("minute")} (${timeZone})`;
+  return `${get("year")}-${get("month")}-${get("day")} ${hour}:${get("minute")} (${timeZone})`;
 }
 
 /**
@@ -116,20 +103,12 @@ export function formatWallClockInSiteZone(dueAt: string, timeZone: string): stri
   const match = WALL_CLOCK_RE.exec(dueAt.trim());
   if (!match) return `${dueAt} (${timeZone})`;
   const [, day, monthStr, year, hour, minute] = match;
-  const monthIdx = Number(monthStr) - 1;
-  const monthName = MONTHS_SHORT[monthIdx] ?? monthStr;
-  return `${day} ${monthName} ${year}, ${hour}:${minute} (${timeZone})`;
+  return `${year}-${monthStr}-${day} ${hour}:${minute} (${timeZone})`;
 }
 
 /**
  * Formats a site-local `YYYY-MM-DD` date (`due_on`) for display, optionally naming the zone.
  */
 export function formatLocalDate(isoDate: string, timeZone?: string): string {
-  const match = ISO_DATE_RE.exec(isoDate);
-  if (!match) return timeZone ? `${isoDate} (${timeZone})` : isoDate;
-  const [, year, monthStr, day] = match;
-  const monthIdx = Number(monthStr) - 1;
-  const monthName = MONTHS_SHORT[monthIdx] ?? monthStr;
-  const formatted = `${day} ${monthName} ${year}`;
-  return timeZone ? `${formatted} (${timeZone})` : formatted;
+  return timeZone ? `${isoDate} (${timeZone})` : isoDate;
 }

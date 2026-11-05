@@ -47,29 +47,29 @@ describe("daysAgo", () => {
 describe("Rule 4 timezone formatting", () => {
   it("formats ISO 8601 UTC timestamps in the site's timezone and names the zone", () => {
     expect(formatUtcInSiteZone("2026-10-06T02:15:07Z", "Asia/Singapore")).toBe(
-      "06 Oct 2026, 10:15 (Asia/Singapore)",
+      "2026-10-06 10:15 (Asia/Singapore)",
     );
     expect(formatUtcInSiteZone("2026-10-06T15:30:00Z", "Australia/Sydney")).toBe(
-      "07 Oct 2026, 02:30 (Australia/Sydney)",
+      "2026-10-07 02:30 (Australia/Sydney)",
     );
   });
 
   it("formats Unix seconds in the site's timezone and names the zone", () => {
     // 2026-10-06T02:15:00Z = 1791252900
     expect(formatUnixInSiteZone(1791252900, "Asia/Jakarta")).toBe(
-      "06 Oct 2026, 09:15 (Asia/Jakarta)",
+      "2026-10-06 09:15 (Asia/Jakarta)",
     );
   });
 
   it("formats event due_at as site-local wall-clock time without double-shifting", () => {
     expect(formatWallClockInSiteZone("07/10/2026 10:00", "Asia/Singapore")).toBe(
-      "07 Oct 2026, 10:00 (Asia/Singapore)",
+      "2026-10-07 10:00 (Asia/Singapore)",
     );
   });
 
   it("formats site-local due_on dates cleanly", () => {
     expect(formatLocalDate("2026-10-07", "Asia/Singapore")).toBe(
-      "07 Oct 2026 (Asia/Singapore)",
+      "2026-10-07 (Asia/Singapore)",
     );
   });
 });

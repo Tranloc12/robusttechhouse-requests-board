@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatLocalDate, formatUtcInSiteZone } from "../lib/dates";
+import { formatUtcInSiteZone } from "../lib/dates";
 import type { EnrichedBoardRow } from "../lib/rules";
 import type { SortDir, SortField, Status, StatusOption } from "../types";
 
@@ -147,9 +147,7 @@ export function RequestsTable({
                 r.created_at,
                 row.siteTimezone,
               );
-              const dueDisplay = r.due_on
-                ? formatLocalDate(r.due_on, row.siteTimezone)
-                : "—";
+              const dueDisplay = r.due_on ?? "—";
 
               return (
                 <tr
