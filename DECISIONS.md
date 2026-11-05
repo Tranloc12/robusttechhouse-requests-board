@@ -4,16 +4,41 @@ Write in English. Short bullet points are fine. Reviewers read this file alongsi
 
 ## What I assumed
 
-<!-- Anything the brief did not say that you had to decide. -->
+- **Default 30-day window**: `daysAgo(30)` to `daysAgo(0)` (inclusive) based on the current date (`2026-11-05`, giving `2026-10-06` to `2026-11-05` by default). Each request is evaluated against that `[from, to]` range after converting its `created_at` UTC timestamp into the request's own site timezone (Rule 1).
+- **Status filter options**: Because Rule 1 states that `canceled` requests never count on the board, the status dropdown offers `All active statuses`, `Pending`, `Processing`, and `Complete` (labels loaded from `/v1/statuses`). If a `canceled`, deleted, or merged request is opened directly via URL (`?request=<id>`) or becomes excluded during a live update while open, the detail modal displays an explanation banner.
+- **Sorting by Due Date with `due_on: null`**: Requests without a due date (`due_on: null`) are always placed after requests that have a concrete `due_on` date when sorting by due date (both ascending and descending), so actionable deadlines appear first. Ties break by `created_at` and `id`.
+- **Shareable URL state**: All board state (`from`, `to`, `site`, `status`, `sort`, `dir`, `overdue`, `q`, and open `request` ID) is reflected in the URL query string via `history.replaceState` so copying the browser address bar or clicking **Copy shareable link** reproduces the exact view for a colleague.
+- **Event `assignee_name` resolution**: Unlike `request.assignee.id` and `event.actor_id`, `RequestEvent` only provides `assignee_name: string | null` without an `assignee_id`. In addition to strictly resolving `request.assignee.id` and `event.actor_id` via `/v1/staff` (Rule 3), we also cross-check `event.assignee_name` against current `/v1/staff` entries so hyphenated name updates (e.g. `Grace Ong` → `Grace Ong-Wee`) are reflected consistently.
+- **Undone events visibility**: Per Rule 5, both an event with `reverts_id` and the target event it points at are hidden from the timeline by default, and excluded when computing First Response (Rule 6). When a request has undone events, the timeline header provides an optional toggle button so a manager or reviewer can inspect the hidden pair if needed.
 
 ## What I found in the API or data
 
-<!-- Anything that did not match the docs, or surprised you, and how you handled it. -->
+- **Off-by-one boundary overlap in `/v1/requests` pagination**: When paging `/v1/requests?per_page=100`, page `N + 1` repeats the last item of page `N` as its first item (99 net new items per subsequent page). We deduplicate all fetched pages into a `Map<number, HelpdeskRequest>` keyed by `request.id` (`deduplicateRequests`).
+- **Server `created_from` / `created_to` filters operate on UTC dates, not site-local dates**: Passing `created_from=06/10/2026` to `/v1/requests` filters for `created_at >= 2026-10-06T00:00:00Z`. Because Sydney (`Australia/Sydney`, UTC+11), Singapore (`Asia/Singapore`, UTC+8), and Jakarta (`Asia/Jakarta`, UTC+7) are ahead of UTC, requests created in the morning of `2026-10-06` local time have a `2026-10-05` UTC date and would be missed by an unbuffered query. We pad API queries by ±1 day (`from - 1 day` to `to + 1 day`) and apply the exact site-local date check (`doesRequestCount`) client-side.
+- **Duplicate and mutated staff names in `/v1/staff`**:
+  - Two distinct staff members share the name `"Marcus Lee"` (`id: 368` and `id: 371`), so staff must always be keyed by numeric `id`, never by name.
+  - Staff names change over time via `staff.updated` (e.g., `id: 335` `"Aisha Rahman-Lim"` and `id: 353` changing from `"Grace Ong"` to `"Grace Ong-Wee"` at change `seq: 79279`), while `request.assignee.name` and `event.actor_name` on existing records remain stale. We always resolve names by ID from `/v1/staff`.
+- **Undone `processing` events (`reverts_id`) and System `processing` events (`actor_id: null`)**:
+  - Several requests (such as `WO-41214`, `WO-64893`, `WO-64664`) have an early `processing` event that was later undone by an event with `reverts_id` (`note: "Status changed in error"`). Filtering out undone pairs before evaluating Rule 6 prevents an accidental, reverted status change from being reported as the First Response.
+  - Other requests (such as `WO-65122`) have a `processing` event created automatically by `"System"` (`actor_id: null`, `note: "Auto-assigned by workflow"`), which `findFirstResponse` ignores per Rule 6.
+- **Mixed timestamp formats across fields**: `created_at` and `updated_at` are ISO 8601 UTC strings, event `at` is Unix **seconds**, `due_on` is `YYYY-MM-DD` site-local, and event `due_at` is `"DD/MM/YYYY HH:MM"` already in site-local wall-clock time. We convert UTC/Unix instants into the site's IANA timezone via `Intl.DateTimeFormat`, format `due_at` and `due_on` without double-shifting timezones, and explicitly append the IANA timezone name (e.g., `(Asia/Singapore)`) to all displayed times.
+- **`/v1/changes` starts from `seq: 1` (~79,300 items) when called without a cursor and overlaps items between pages**: Walking `/v1/changes` from the beginning requires ~159 pages of 500 items and overlaps 2 items per page boundary. To guarantee live updates appear within 20 seconds right after page load (Level 3), we pair incremental `/v1/changes` cursor polling (with `410` cursor-expiry recovery and idempotent application) with a lightweight 20-second refresh of `/v1/staff`, page 1 of `/v1/requests`, and any open request's events.
+- **Rate limits (`429 Retry-After`) and intermittent `503 Service Unavailable`**: The API enforces per-endpoint rate limits (`429` with `Retry-After` seconds) and occasionally returns `503`. Our client in `src/api.ts` caps concurrent page requests at 3, automatically backs off and retries using `Retry-After`, keeps existing board data on screen, and notifies the UI to show a non-blocking status banner.
+- **Browser-exposed token (`envPrefix: ["VITE_", "HELPDESK_"]`)**: `vite.config.ts` exposes `HELPDESK_TOKEN` to `import.meta.env` in the browser bundle. This is expected for the browser-only practice API; in production, requests would route through a backend-for-frontend (BFF) or edge proxy that injects the secret token server-side.
 
 ## How I used AI
 
-<!-- Which tools, what you asked, what came back wrong, what you changed. "I didn't use AI" is fine too. -->
+- Used an AI coding assistant to help scaffold the TypeScript domain helpers (`src/lib/dates.ts`, `src/lib/rules.ts`, `src/lib/urlState.ts`), React components (`FilterBar`, `RequestsTable`, `RequestDetailModal`), and unit test suites.
+- **What came back wrong / what I changed**:
+  - An initial naive approach would pass `created_from` and `created_to` directly to `/v1/requests` without accounting for the server filtering by UTC date vs. Rule 1's site-local date requirement; after testing boundary timestamps (`2026-10-05T15:30:00Z` in `Australia/Sydney`), we added ±1 day query padding plus strict client-side site-local filtering.
+  - Testing pagination against `/v1/requests` revealed the off-by-one boundary overlap between consecutive pages, so we changed request storage from a flat array concatenation to an ID-keyed `Map<number, HelpdeskRequest>`.
+  - Inspecting `/v1/changes` revealed ~79,300 historical events from `seq: 1`, which would take over a minute to page through under rate limits if used alone on cold start; we added the hybrid 20-second sync so changes always appear well within a minute.
 
 ## Trade-offs and what I would do next
 
-<!-- What you left out to stay within 3 hours, and what you would do with more time. -->
+- **Client-side pagination with "Show all" option vs. virtualized scrolling**: A 30-day window has ~1,650 counting requests. To keep mobile rendering fast and accessible without adding a third-party virtualization library (which can complicate keyboard table navigation and screen readers), the table defaults to 100 rows per view with instant page controls and a `Rows per view: All` option. With more time, I would add windowed row virtualization that preserves native ARIA grid/table row counts (`aria-rowcount` / `aria-rowindex`).
+- **Initial multi-page loading vs. server-side cursor/tail endpoint**: On first load of a 30-day range, the browser fetches ~18 pages of `/v1/requests` (streaming page 1 immediately and loading pages 2–18 with concurrency 3 in ~1.8s). With more time, I would cache the normalized dataset in `IndexedDB` alongside the latest `/v1/changes` cursor (within its 15-minute TTL) so tab reloads are near-instant.
+- **Additional features I would build next**:
+  - SLA business-hours countdown badges using each site's `business_hours` from `/v1/sites` and public holidays from `/v1/sites/{id}/holidays`.
+  - Filter by assignee (using `staff.id` so the two `"Marcus Lee"` staff members can be filtered distinctly) and priority.
+  - End-to-end Playwright tests covering keyboard navigation, mobile viewport layout, and mocked `429`/`503`/`410` recovery flows.
